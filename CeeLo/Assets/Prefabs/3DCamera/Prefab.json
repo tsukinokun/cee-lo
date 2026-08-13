@@ -1,0 +1,12 @@
+{
+    "Components": [
+        {
+            "key": "CameraComponent",
+            "value": "CeeLo/Assets/Prefabs/3DCamera/Camera.json"
+        },
+        {
+            "key": "TransformComponent",
+            "value": "CeeLo/Assets/Prefabs/3DCamera/Transform.json"
+        }
+    ]
+}

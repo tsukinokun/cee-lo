@@ -1,0 +1,33 @@
+# Build results
+[Bb]in/
+bin-int/
+[Oo]bj/
+x64/
+Debug/
+Release/
+
+# Visual Studio cache
+.vs/
+
+# Premake generated project files
+.build/
+
+# Precompiled headers
+*.pch
+*.pdb
+*.ipch
+
+# Logs
+*.log
+
+# DLL / EXE
+*.dll
+*.exe
+
+# DirectX shader cache
+*.cso
+*.pso
+
+# アセットマネージャーが生成する中間ファイルを無視
+Cache/
+**/Cache/

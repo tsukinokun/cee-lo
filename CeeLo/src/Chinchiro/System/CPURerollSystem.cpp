@@ -1,0 +1,49 @@
+//-------------------------------------------------------------
+//! @file   CPURerollSystem.cpp
+//! @brief  CPURerollSystemクラスの実装
+//! @author 山﨑愛
+//-------------------------------------------------------------
+#include <CeeLo/Chinchiro/ECS/System/CPURerollSystem.hpp>
+#include <CeeLo/Chinchiro/ECS/Component/PlayerComponent.hpp>
+#include <CeeLo/Chinchiro/ECS/Component/RoundComponent.hpp>
+#include <CeeLo/Chinchiro/ECS/Component/CPUControllerComponent.hpp>
+#include <CeeLo/Chinchiro/ECS/Util/DiceThrowUtil.hpp>
+
+// 名前空間 : CeeLo::Chinchiro::ECS
+namespace CeeLo::Chinchiro::ECS {
+
+    //-------------------------------------------------------------
+    //! @brief  システムの更新
+    //-------------------------------------------------------------
+    void CPURerollSystem::Update(Tsukino::ECS::Registry& registry, float deltaTime) {
+        auto view = registry.View<PlayerComponent, CPUControllerComponent>();
+
+        view.each([&](entt::entity, PlayerComponent& player, CPUControllerComponent& cpuController) {
+            if(!cpuController.isDropPending) {
+                // タイマーが動いていない（＝振り直し待ちではない）間は何もしない
+                if(cpuController.rerollDelayTimer <= 0.0f) {
+                    return;
+                }
+
+                cpuController.rerollDelayTimer -= deltaTime;
+                if(cpuController.rerollDelayTimer > 0.0f) {
+                    return;    // まだ「考え中」
+                }
+
+                cpuController.rerollDelayTimer = 0.0f;
+                cpuController.isDropPending    = true;
+            }
+
+            // 考え中タイマーは消化済み。リスポン（Kinematicテレポート→Hovering）が完了するまで
+            // DropDiceSetは何もしないので、完了し次第このフレームで投下される
+            RoundComponent& round = registry.GetComponent<RoundComponent>(player.roundEntity);
+            if(!DropDiceSet(registry, round)) {
+                return;
+            }
+
+            cpuController.isDropPending = false;
+            player.phase                 = TurnPhase::Rolling;
+        });
+    }
+
+}    // namespace CeeLo::Chinchiro::ECS
