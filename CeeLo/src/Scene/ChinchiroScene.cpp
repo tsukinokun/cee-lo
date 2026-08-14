@@ -35,8 +35,6 @@
 #include <Tsukino/BuiltIn/ECS/Component/ModelComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/AnimationPlayerComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/SkeletonOutputComponent.hpp>
-#include <Tsukino/BuiltIn/ECS/Component/CollisionComponent.hpp>
-#include <Tsukino/BuiltIn/ECS/Component/RigidBodyComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/AnimationControllerComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/SpringBoneComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/EffectComponent.hpp>
@@ -46,7 +44,7 @@
 #include <Tsukino/BuiltIn/ECS/Serialization/CameraComponentSerialization.hpp>
 
 // チンチロ固有のコンポーネント
-#include <CeeLo/Chinchiro/ECS/Component/DiceComponent.hpp>
+#include <CeeLo/Chinchiro/ECS/RegisterChinchiroComponents.hpp>
 #include <CeeLo/Chinchiro/ECS/Component/RoundOwnerComponent.hpp>
 #include <CeeLo/Chinchiro/ECS/Component/RoundComponent.hpp>
 #include <CeeLo/Chinchiro/ECS/Component/PlayerComponent.hpp>
@@ -80,102 +78,77 @@
 namespace {
 
     //-------------------------------------------------------------
-    //! @brief  お椀エンティティを生成する
-    //! @param  scene               [in] 生成先のシーン
+    //! @brief  お椀エンティティをPrefabから生成する
+    //! @param  context             [in] Prefabの組み立てに使うエンジンコンテキスト
     //! @param  registry            [in] ECSレジストリ
     //! @param  bowlModelHandle     [in] お椀の表示用モデルのアセットハンドル
     //! @param  bowlColModelHandle  [in] お椀の地形生成（コリジョン）専用の軽量モデルのアセットハンドル
     //! @param  centerX             [in] お椀の中心X座標（左右の配置に使用）
     //! @param  terrainSeed         [in] 地形生成の乱数シード（左右で同じ形にならないよう変える）
+    //! @note   ModelComponent/TerrainGenerationRequestComponentはPrefab上は"null"にしてある。
+    //!         AssetManager::Loadはパスごとの重複排除を行わないため、これらは従来通り
+    //!         シーン起動時に1回だけLoadしたハンドルをApplyOverrideで注入する
+    //!         （Prefab側でAssetRefのパスを直接解決させると、お椀2個・サイコロ6個分
+    //!         同じモデルを毎回re-loadしてしまう）。
     //-------------------------------------------------------------
-    Tsukino::ECS::Entity CreateBowl(Tsukino::ECS::Scene& scene, Tsukino::ECS::Registry& registry, Tsukino::Asset::AssetHandle bowlModelHandle,
-                                     Tsukino::Asset::AssetHandle bowlColModelHandle, float centerX, uint32_t terrainSeed) {
-        Tsukino::ECS::Entity bowlEntity = scene.CreateEntity();
+    Tsukino::ECS::Entity CreateBowl(Tsukino::EngineIntegration::EngineContext* context, Tsukino::ECS::Registry& registry,
+                                     Tsukino::Asset::AssetHandle bowlModelHandle, Tsukino::Asset::AssetHandle bowlColModelHandle, float centerX,
+                                     uint32_t terrainSeed) {
+        const std::string prefabPath = "CeeLo/Assets/Prefabs/Bowl/Prefab.json";
+        entt::entity      bowlEntity = context->prefabFactory->Instantiate(prefabPath, registry);
 
-        Tsukino::BuiltIn::ECS::TransformComponent& transform = registry.AddComponent<Tsukino::BuiltIn::ECS::TransformComponent>(bowlEntity);
-        transform.position                                   = hlslpp::float3(centerX, 0.0f, 0.0f);
-        transform.rotation                                   = hlslpp::quaternion(0.0f, 0.0f, 0.0f, 1.0f);    // 無回転
-        transform.scale                                      = hlslpp::float3(1.0f, 1.0f, 1.0f);
-        transform.dirty                                      = true;          // 初回計算のためフラグを立てる
-        transform.parent                                     = entt::null;    // 親なし
+        Tsukino::BuiltIn::ECS::TransformComponent transformOverride{};
+        transformOverride.position = hlslpp::float3(centerX, 0.0f, 0.0f);
+        transformOverride.dirty    = true;    // 初回計算のためフラグを立てる
+        context->prefabFactory->ApplyOverride<Tsukino::BuiltIn::ECS::TransformComponent>(registry, bowlEntity, transformOverride);
 
-        Tsukino::BuiltIn::ECS::ModelComponent& model = registry.AddComponent<Tsukino::BuiltIn::ECS::ModelComponent>(bowlEntity);
-        model.modelHandle                            = bowlModelHandle;
-        model.visible                                = true;
+        Tsukino::BuiltIn::ECS::ModelComponent modelOverride{};
+        modelOverride.modelHandle = bowlModelHandle;
+        modelOverride.visible     = true;
+        context->prefabFactory->ApplyOverride<Tsukino::BuiltIn::ECS::ModelComponent>(registry, bowlEntity, modelOverride);
 
-        // モデルにコリジョンをつける
-        Tsukino::BuiltIn::ECS::CollisionComponent& collision = registry.AddComponent<Tsukino::BuiltIn::ECS::CollisionComponent>(bowlEntity);
-        collision.type                                       = Tsukino::BuiltIn::ECS::ColliderType::Box;
-        collision.isSensor                                   = false;    // 衝突判定を有効にする
-        collision.extent                                     = 100.0f;
-
-        Tsukino::BuiltIn::ECS::TerrainGenerationRequestComponent& req =
-            registry.AddComponent<Tsukino::BuiltIn::ECS::TerrainGenerationRequestComponent>(bowlEntity);
-        req.amplitude          = 15.0f;
-        req.noiseFrequency     = 0.08f;
-        req.seed               = terrainSeed;
-        req.noiseType          = Tsukino::BuiltIn::ECS::TerrainNoiseType::Noise;
-        req.collisionModelHandle = bowlColModelHandle;    // 表示用より軽いメッシュで地形生成する
-
-        // RBをつける
-        Tsukino::BuiltIn::ECS::RigidbodyComponent& rb = registry.AddComponent<Tsukino::BuiltIn::ECS::RigidbodyComponent>(bowlEntity);
-        rb.type                                       = Tsukino::BuiltIn::ECS::RigidbodyType::Static;
+        Tsukino::BuiltIn::ECS::TerrainGenerationRequestComponent terrainOverride{};
+        terrainOverride.amplitude            = 15.0f;
+        terrainOverride.noiseFrequency       = 0.08f;
+        terrainOverride.seed                 = terrainSeed;
+        terrainOverride.noiseType            = Tsukino::BuiltIn::ECS::TerrainNoiseType::Noise;
+        terrainOverride.collisionModelHandle = bowlColModelHandle;    // 表示用より軽いメッシュで地形生成する
+        context->prefabFactory->ApplyOverride<Tsukino::BuiltIn::ECS::TerrainGenerationRequestComponent>(registry, bowlEntity, terrainOverride);
 
         return bowlEntity;
     }
 
     //-------------------------------------------------------------
-    //! @brief  1セット分（3個）のサイコロエンティティを生成する
-    //! @param  scene           [in] 生成先のシーン
+    //! @brief  1セット分（3個）のサイコロエンティティをPrefabから生成する
+    //! @param  context         [in] Prefabの組み立てに使うエンジンコンテキスト
     //! @param  registry        [in] ECSレジストリ
     //! @param  diceModelHandle [in] サイコロモデルのアセットハンドル
     //! @param  bowlCenter      [in] 所属するお椀の中心座標（RoundOwnerComponent/場外判定に使用）
     //-------------------------------------------------------------
-    std::array<Tsukino::ECS::Entity, 3> CreateDiceSet(Tsukino::ECS::Scene& scene, Tsukino::ECS::Registry& registry,
+    std::array<Tsukino::ECS::Entity, 3> CreateDiceSet(Tsukino::EngineIntegration::EngineContext* context, Tsukino::ECS::Registry& registry,
                                                         Tsukino::Asset::AssetHandle diceModelHandle, const hlslpp::float3& bowlCenter) {
         std::array<Tsukino::ECS::Entity, 3> diceEntities{};
+        const std::string                   prefabPath = "CeeLo/Assets/Prefabs/Dice/Prefab.json";
 
         for(int i = 0; i < 3; ++i) {
-            Tsukino::ECS::Entity diceEntity = scene.CreateEntity();
+            entt::entity diceEntity = context->prefabFactory->Instantiate(prefabPath, registry);
 
-            // TransformComponent の追加と初期化
             // 3個ともお椀の中に収まり、かつ重ならないよう、投下待ち位置をX方向に少しずつずらす
             // （リスポン時の位置と一致させるため、ComputeDiceSpawnOffsetを共通で使う）
-            Tsukino::BuiltIn::ECS::TransformComponent& transform = registry.AddComponent<Tsukino::BuiltIn::ECS::TransformComponent>(diceEntity);
-            transform.position = bowlCenter + CeeLo::Chinchiro::ECS::ComputeDiceSpawnOffset(i);
-            transform.rotation                                   = hlslpp::quaternion(0.0f, 0.0f, 0.0f, 1.0f);    // 無回転
-            transform.scale                                      = hlslpp::float3(1.0f, 1.0f, 1.0f);
-            transform.dirty                                      = true;          // 初回計算のためフラグを立てる
-            transform.parent                                     = entt::null;    // 親なし
+            Tsukino::BuiltIn::ECS::TransformComponent transformOverride{};
+            transformOverride.position = bowlCenter + CeeLo::Chinchiro::ECS::ComputeDiceSpawnOffset(i);
+            transformOverride.dirty    = true;    // 初回計算のためフラグを立てる
+            context->prefabFactory->ApplyOverride<Tsukino::BuiltIn::ECS::TransformComponent>(registry, diceEntity, transformOverride);
 
-            // ModelComponent の追加
-            Tsukino::BuiltIn::ECS::ModelComponent& model = registry.AddComponent<Tsukino::BuiltIn::ECS::ModelComponent>(diceEntity);
-            model.modelHandle                            = diceModelHandle;
-            model.visible                                = true;
-
-            // モデルにコリジョンをつける
-            Tsukino::BuiltIn::ECS::CollisionComponent& collision = registry.AddComponent<Tsukino::BuiltIn::ECS::CollisionComponent>(diceEntity);
-            collision.type                                       = Tsukino::BuiltIn::ECS::ColliderType::Box;
-            collision.extent                                     = hlslpp::float3(0.8f, 0.8f, 0.8f);
-            collision.isSensor                                   = false;    // 衝突判定を有効にする
-
-            // RBをつける
-            Tsukino::BuiltIn::ECS::RigidbodyComponent& rb = registry.AddComponent<Tsukino::BuiltIn::ECS::RigidbodyComponent>(diceEntity);
-            rb.type                                       = Tsukino::BuiltIn::ECS::RigidbodyType::Dynamic;
-            rb.mass                                       = 1.0f;
-            rb.gravityFactor                              = 1.0f;
-            rb.restitution                                = 0.5f;
-            rb.freezeRotationX                            = false;
-            rb.freezeRotationY                            = false;
-            rb.freezeRotationZ                            = false;
-
-            // 静止判定・出目確定用
-            registry.AddComponent<CeeLo::Chinchiro::ECS::DiceComponent>(diceEntity);
+            Tsukino::BuiltIn::ECS::ModelComponent modelOverride{};
+            modelOverride.modelHandle = diceModelHandle;
+            modelOverride.visible     = true;
+            context->prefabFactory->ApplyOverride<Tsukino::BuiltIn::ECS::ModelComponent>(registry, diceEntity, modelOverride);
 
             // 場外判定の基準座標（所属するお椀の中心）
-            CeeLo::Chinchiro::ECS::RoundOwnerComponent& owner =
-                registry.AddComponent<CeeLo::Chinchiro::ECS::RoundOwnerComponent>(diceEntity);
-            owner.bowlCenter = bowlCenter;
+            CeeLo::Chinchiro::ECS::RoundOwnerComponent ownerOverride{};
+            ownerOverride.bowlCenter = bowlCenter;
+            context->prefabFactory->ApplyOverride<CeeLo::Chinchiro::ECS::RoundOwnerComponent>(registry, diceEntity, ownerOverride);
 
             // スペース入力で投下されるまで、空中で静止＋回転しながら待機させる
             CeeLo::Chinchiro::ECS::SetupDiceHover(registry, diceEntity);
@@ -314,6 +287,11 @@ namespace CeeLo {
         Tsukino::ECS::Registry& registry = m_scene.GetRegistry();
 
         //--------------------------------------------------------------
+        // チンチロ固有コンポーネントをPrefabFactoryへ登録
+        //--------------------------------------------------------------
+        CeeLo::Chinchiro::ECS::RegisterChinchiroComponents(*context->prefabFactory);
+
+        //--------------------------------------------------------------
         // お椀・サイコロを左右2セット生成する
         // CPU側 = 左（X-）、プレイヤー側 = 右（X+）
         //--------------------------------------------------------------
@@ -328,11 +306,11 @@ namespace CeeLo {
         const hlslpp::float3 cpuBowlCenter    = hlslpp::float3(-kBowlOffsetX, 0.0f, 0.0f);
         const hlslpp::float3 playerBowlCenter = hlslpp::float3(kBowlOffsetX, 0.0f, 0.0f);
 
-        CreateBowl(m_scene, registry, bowlModelHandle, bowlColModelHandle, cpuBowlCenter.x, kCpuTerrainSeed);
-        CreateBowl(m_scene, registry, bowlModelHandle, bowlColModelHandle, playerBowlCenter.x, kPlayerTerrainSeed);
+        CreateBowl(context, registry, bowlModelHandle, bowlColModelHandle, cpuBowlCenter.x, kCpuTerrainSeed);
+        CreateBowl(context, registry, bowlModelHandle, bowlColModelHandle, playerBowlCenter.x, kPlayerTerrainSeed);
 
-        std::array<Tsukino::ECS::Entity, 3> cpuDiceEntities    = CreateDiceSet(m_scene, registry, diceModelHandle, cpuBowlCenter);
-        std::array<Tsukino::ECS::Entity, 3> playerDiceEntities = CreateDiceSet(m_scene, registry, diceModelHandle, playerBowlCenter);
+        std::array<Tsukino::ECS::Entity, 3> cpuDiceEntities    = CreateDiceSet(context, registry, diceModelHandle, cpuBowlCenter);
+        std::array<Tsukino::ECS::Entity, 3> playerDiceEntities = CreateDiceSet(context, registry, diceModelHandle, playerBowlCenter);
 
         //--------------------------------------------------------------
         // RoundComponent：各セット3個のサイコロを束ねる

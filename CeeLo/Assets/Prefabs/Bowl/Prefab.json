@@ -1,0 +1,24 @@
+{
+    "Components": [
+        {
+            "key": "TransformComponent",
+            "value": "CeeLo/Assets/Prefabs/Bowl/Transform.json"
+        },
+        {
+            "key": "ModelComponent",
+            "value": "null"
+        },
+        {
+            "key": "CollisionComponent",
+            "value": "CeeLo/Assets/Prefabs/Bowl/Collision.json"
+        },
+        {
+            "key": "TerrainGenerationRequestComponent",
+            "value": "null"
+        },
+        {
+            "key": "RigidbodyComponent",
+            "value": "CeeLo/Assets/Prefabs/Bowl/Rigidbody.json"
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "Components": [
+        {
+            "key": "TransformComponent",
+            "value": "CeeLo/Assets/Prefabs/Dice/Transform.json"
+        },
+        {
+            "key": "ModelComponent",
+            "value": "null"
+        },
+        {
+            "key": "CollisionComponent",
+            "value": "CeeLo/Assets/Prefabs/Dice/Collision.json"
+        },
+        {
+            "key": "RigidbodyComponent",
+            "value": "CeeLo/Assets/Prefabs/Dice/Rigidbody.json"
+        },
+        {
+            "key": "DiceComponent",
+            "value": "null"
+        },
+        {
+            "key": "RoundOwnerComponent",
+            "value": "null"
+        }
+    ]
+}
