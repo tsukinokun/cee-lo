@@ -59,20 +59,11 @@ namespace CeeLo::Chinchiro::ECS {
         //-------------------------------------------------------------
         std::string HandToDebugString(Hand hand, u8 subValue) {
             switch(hand) {
-            case Hand::PinZoro:
-                return "PinZoro";
             case Hand::Arashi:
-                return "Arashi(" + std::to_string(subValue) + ")";
-            case Hand::Shigoro:
-                return "Shigoro";
             case Hand::Me:
-                return "Me(" + std::to_string(subValue) + ")";
-            case Hand::HiFuMi:
-                return "HiFuMi";
-            case Hand::MeNashi:
-                return "MeNashi";
+                return std::string(HandName(hand)) + "(" + std::to_string(subValue) + ")";
             default:
-                return "None";
+                return HandName(hand);
             }
         }
 #endif

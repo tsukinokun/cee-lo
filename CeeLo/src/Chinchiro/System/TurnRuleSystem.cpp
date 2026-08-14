@@ -11,8 +11,6 @@
 
 #include <Tsukino/Core/Log.hpp>
 
-#include <cstdlib>
-
 // 名前空間 : CeeLo::Chinchiro::ECS
 namespace CeeLo::Chinchiro::ECS {
     namespace {
@@ -20,14 +18,6 @@ namespace CeeLo::Chinchiro::ECS {
 
         constexpr float kCpuRerollDelayMin = 0.6f;    //!< CPUの「考え中」演出の最小秒数
         constexpr float kCpuRerollDelayMax = 1.2f;    //!< CPUの「考え中」演出の最大秒数
-
-        //-------------------------------------------------------------
-        //! @brief  kCpuRerollDelayMin 〜 kCpuRerollDelayMax のランダムな遅延秒数を返す
-        //-------------------------------------------------------------
-        float RandomRerollDelay() {
-            const float t = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
-            return kCpuRerollDelayMin + t * (kCpuRerollDelayMax - kCpuRerollDelayMin);
-        }
     }    // namespace
 
     //-------------------------------------------------------------
@@ -77,7 +67,7 @@ namespace CeeLo::Chinchiro::ECS {
 
             if(CPUControllerComponent* cpuController = registry.try_get<CPUControllerComponent>(playerEntity)) {
                 // CPU側は「考え中」を挟んでCPURerollSystemが自動で振り直す
-                cpuController->rerollDelayTimer = RandomRerollDelay();
+                cpuController->rerollDelayTimer = RandomFloat(kCpuRerollDelayMin, kCpuRerollDelayMax);
             }
             // 人間側はここでWaitingに戻すだけで、再度のスペース入力（RollTriggerSystem）を待つ
         });

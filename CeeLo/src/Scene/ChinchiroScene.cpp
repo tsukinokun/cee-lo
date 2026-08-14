@@ -149,18 +149,7 @@ namespace {
             {"HumanPlayer", "CeeLo/Assets/Prefabs/Player/Human/Prefab.json"},
         };
 
-        // TODO(temp-verify): remove after manual verification
-        std::ofstream dbg2("Tsukino.Sandbox_debug_roundplayer.txt", std::ios::app);
-        dbg2 << "checkpoint0: before InstantiateGroup\n";
-        dbg2.flush();
-
         Tsukino::Engine::ECS::Prefab::PrefabFactory::PrefabInstance instance = context->prefabFactory->InstantiateGroup(entries, registry);
-
-        dbg2 << "checkpoint1: after InstantiateGroup, size=" << instance.size() << "\n";
-        for(const auto& [name, ent] : instance) {
-            dbg2 << "  " << name << " -> " << static_cast<uint32_t>(ent) << "\n";
-        }
-        dbg2.flush();
 
         //   各Diceの個別設定（位置・モデル・所属お椀）はEntityRefでは表現しないデータのため、
         //   ラベル/お椀と同様にInstantiate後にApplyOverrideで設定する。
@@ -168,8 +157,6 @@ namespace {
         const std::array<const char*, 3> playerDiceNames = {"PlayerDice0", "PlayerDice1", "PlayerDice2"};
 
         auto setupDice = [&](const char* name, int index, const hlslpp::float3& bowlCenter) {
-            dbg2 << "checkpoint2: setupDice " << name << "\n";
-            dbg2.flush();
             entt::entity diceEntity = instance.at(name);
 
             // 3個ともお椀の中に収まり、かつ重ならないよう、投下待ち位置をX方向に少しずつずらす
@@ -198,14 +185,8 @@ namespace {
             setupDice(playerDiceNames[i], i, playerBowlCenter);
         }
 
-        dbg2 << "checkpoint3: before final lookups\n";
-        dbg2.flush();
-
         outCpuEntity    = instance.at("CpuPlayer");
         outPlayerEntity = instance.at("HumanPlayer");
-
-        dbg2 << "checkpoint4: done\n";
-        dbg2.flush();
     }
 
     //-------------------------------------------------------------
@@ -225,6 +206,16 @@ namespace {
         context->prefabFactory->ApplyOverride<Tsukino::BuiltIn::ECS::TransformComponent>(registry, labelEntity, transformOverride);
 
         return labelEntity;
+    }
+
+    //-------------------------------------------------------------
+    //! @brief  上書き設定の要らない単発Prefab（カメラ・ライト・スカイ等）をPrefabから生成する
+    //! @param  context    [in] Prefabの組み立てに使うエンジンコンテキスト
+    //! @param  registry   [in] ECSレジストリ
+    //! @param  prefabPath [in] Prefab.jsonのパス
+    //-------------------------------------------------------------
+    void InstantiateSingletonPrefab(Tsukino::EngineIntegration::EngineContext* context, Tsukino::ECS::Registry& registry, const std::string& prefabPath) {
+        [[maybe_unused]] entt::entity entity = context->prefabFactory->Instantiate(prefabPath, registry);
     }
 
     //-------------------------------------------------------------
@@ -434,46 +425,30 @@ namespace CeeLo {
         //--------------------------------------------------------------
         // 2Dカメラエンティティの生成
         //--------------------------------------------------------------
-        {
-            const std::string prefabPath  = "CeeLo/Assets/Prefabs/Camera2D/Prefab.json";
-            entt::entity      cameraEntity2D = context->prefabFactory->Instantiate(prefabPath, registry);
-        }
+        InstantiateSingletonPrefab(context, registry, "CeeLo/Assets/Prefabs/Camera2D/Prefab.json");
 
         //--------------------------------------------------------------
         // 3Dカメラエンティティの生成（左右両方のお椀が画角に収まる引き位置は
         // Assets/Prefabs/3DCamera 側で設定済み）
         //--------------------------------------------------------------
-        {
-            const std::string prefabPath = "CeeLo/Assets/Prefabs/3DCamera/Prefab.json";
-
-            entt::entity testEntity = context->prefabFactory->Instantiate(prefabPath, registry);
-        }
+        InstantiateSingletonPrefab(context, registry, "CeeLo/Assets/Prefabs/3DCamera/Prefab.json");
 
         //--------------------------------------------------------------
         // デバッグカメラエンティティの生成 (デバッグビルドのみ)
         //--------------------------------------------------------------
 #ifdef _DEBUG
-        {
-            const std::string prefabPath    = "CeeLo/Assets/Prefabs/DebugCamera/Prefab.json";
-            entt::entity      debugCamEntity = context->prefabFactory->Instantiate(prefabPath, registry);
-        }
+        InstantiateSingletonPrefab(context, registry, "CeeLo/Assets/Prefabs/DebugCamera/Prefab.json");
 #endif
 
         //--------------------------------------------------------------
         // ディレクショナルライトエンティティの生成
         //--------------------------------------------------------------
-        {
-            const std::string prefabPath  = "CeeLo/Assets/Prefabs/DirectionalLight/Prefab.json";
-            entt::entity      lightEntity = context->prefabFactory->Instantiate(prefabPath, registry);
-        }
+        InstantiateSingletonPrefab(context, registry, "CeeLo/Assets/Prefabs/DirectionalLight/Prefab.json");
 
         //--------------------------------------------------------------
         // スカイアトモスフィアエンティティの生成
         //--------------------------------------------------------------
-        {
-            const std::string prefabPath = "CeeLo/Assets/Prefabs/Sky/Prefab.json";
-            entt::entity      skyEntity  = context->prefabFactory->Instantiate(prefabPath, registry);
-        }
+        InstantiateSingletonPrefab(context, registry, "CeeLo/Assets/Prefabs/Sky/Prefab.json");
     }
 
     //-------------------------------------------------------------

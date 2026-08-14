@@ -8,6 +8,8 @@
 #include <CeeLo/Scene/ChinchiroScene.hpp>
 
 #include <Windows.h>
+#include <cstdlib>
+#include <ctime>
 #include <memory>
 
 //--------------------------------------------------------------
@@ -21,6 +23,8 @@
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
     // DPIスケーリングの無効化
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    // 乱数シードの初期化（サイコロの投下待ち回転・CPUの考え中時間などで使用）
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
     // ログの初期化
     Tsukino::EngineIntegration::EngineIntegration engineIntegration;
     // 初期化

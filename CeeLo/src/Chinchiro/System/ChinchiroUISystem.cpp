@@ -13,11 +13,20 @@
 
 #include <Tsukino/BuiltIn/ECS/Component/FontComponent.hpp>
 
+#include <cstring>
 #include <string>
 
 // 名前空間 : CeeLo::Chinchiro::ECS
 namespace CeeLo::Chinchiro::ECS {
     namespace {
+        //-------------------------------------------------------------
+        //! @brief  HandNameが返すASCII文字列をwstringへ変換する
+        //-------------------------------------------------------------
+        std::wstring WidenHandName(Hand hand) {
+            const char*  name = HandName(hand);
+            return std::wstring(name, name + std::strlen(name));
+        }
+
         //-------------------------------------------------------------
         //! @brief  役の判定結果を表示用の文字列に変換する
         //! @note   FontRendererSystemが使うデフォルトフォント(Arial.spritefont)は
@@ -32,19 +41,15 @@ namespace CeeLo::Chinchiro::ECS {
 
             switch(round.kind) {
             case Hand::PinZoro:
-                return L"PinZoro!!";
+                return WidenHandName(round.kind) + L"!!";
             case Hand::Arashi:
-                return L"Arashi(" + std::to_wstring(round.subValue) + L")";
-            case Hand::Shigoro:
-                return L"Shigoro";
+                return WidenHandName(round.kind) + L"(" + std::to_wstring(round.subValue) + L")";
             case Hand::Me:
-                return L"Me " + std::to_wstring(round.subValue);
-            case Hand::HiFuMi:
-                return L"HiFuMi";
-            case Hand::MeNashi:
-                return L"MeNashi";
-            default:
+                return WidenHandName(round.kind) + L" " + std::to_wstring(round.subValue);
+            case Hand::None:
                 return L"";
+            default:
+                return WidenHandName(round.kind);
             }
         }
 

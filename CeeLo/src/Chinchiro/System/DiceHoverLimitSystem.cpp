@@ -5,9 +5,9 @@
 //-------------------------------------------------------------
 #include <CeeLo/Chinchiro/ECS/System/DiceHoverLimitSystem.hpp>
 #include <CeeLo/Chinchiro/ECS/Component/DiceComponent.hpp>
+#include <CeeLo/Chinchiro/ECS/Util/DiceThrowUtil.hpp>
 
 #include <Tsukino/BuiltIn/ECS/Component/RigidbodyComponent.hpp>
-#include <Tsukino/BuiltIn/ECS/Component/ImpulseRequestComponent.hpp>
 
 // 名前空間 : CeeLo::Chinchiro::ECS
 namespace CeeLo::Chinchiro::ECS {
@@ -44,14 +44,7 @@ namespace CeeLo::Chinchiro::ECS {
             hlslpp::float3 targetAngularVelocity = rigidbody.angularVelocity * (kMaxHoverAngularSpeed / currentSpeed);
             hlslpp::float3 angularImpulse        = rigidbody.mass * (targetAngularVelocity - rigidbody.angularVelocity);
 
-            if(auto* existing = registry.try_get<Tsukino::BuiltIn::ECS::ImpulseRequestComponent>(entity)) {
-                existing->angularImpulse += angularImpulse;
-            } else {
-                Tsukino::BuiltIn::ECS::ImpulseRequestComponent& request =
-                    registry.AddComponent<Tsukino::BuiltIn::ECS::ImpulseRequestComponent>(entity);
-                request.impulse        = hlslpp::float3(0.0f, 0.0f, 0.0f);
-                request.angularImpulse = angularImpulse;
-            }
+            AccumulateImpulse(registry, entity, hlslpp::float3(0.0f, 0.0f, 0.0f), angularImpulse);
         });
     }
 

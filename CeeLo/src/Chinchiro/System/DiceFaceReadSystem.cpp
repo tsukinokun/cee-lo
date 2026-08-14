@@ -11,31 +11,11 @@
 #include <Tsukino/Core/Log.hpp>
 #include <string>
 
-#ifdef _DEBUG
-#include <fstream>
-#include <entt/entt.hpp>
-#endif
-
 // 名前空間 : CeeLo::Chinchiro::ECS
 namespace CeeLo::Chinchiro::ECS {
     namespace {
         // ワールド空間での重力方向（上向き判定の基準）
         const hlslpp::float3 kUpDirection = hlslpp::float3(0.0f, 1.0f, 0.0f);
-
-#ifdef _DEBUG
-        //-------------------------------------------------------------
-        // 【再検証用・一時コード】表示(見た目)とconfirmedValueの計算タイミングが
-        // ズレていないかを確認するための、フレーム単位のダンプログ。
-        // Settled中のサイコロについて、毎フレームの6面dot値・選ばれた面・
-        // confirmedValueをそのままファイルへ書き出す（外部スクリーンショットのタイミング
-        // ズレの影響を受けない、コード内部の生データを見るのが目的）。
-        // 検証が終わったら削除すること。
-        //-------------------------------------------------------------
-        std::ofstream& DebugDumpStream() {
-            static std::ofstream stream("C:\\Users\\tamami197508\\Desktop\\TsukinoEngine\\dice_face_debug.log", std::ios::trunc);
-            return stream;
-        }
-#endif
     }
 
     //-------------------------------------------------------------
@@ -46,7 +26,7 @@ namespace CeeLo::Chinchiro::ECS {
 
         auto view = registry.View<Tsukino::BuiltIn::ECS::TransformComponent, Tsukino::BuiltIn::ECS::RigidbodyComponent, DiceComponent>();
 
-        view.each([&](entt::entity entity, Tsukino::BuiltIn::ECS::TransformComponent& transform,
+        view.each([&](entt::entity, Tsukino::BuiltIn::ECS::TransformComponent& transform,
                        Tsukino::BuiltIn::ECS::RigidbodyComponent& rigidbody, DiceComponent& dice) {
             // 静止確定していないサイコロは何もしない
             if(dice.state != DiceRollState::Settled) {
@@ -62,9 +42,6 @@ namespace CeeLo::Chinchiro::ECS {
 
             float bestDot   = -1.0f;
             u8    bestValue = dice.faceValue[0];
-#ifdef _DEBUG
-            float allDots[6] = {};
-#endif
 
             for(int i = 0; i < 6; ++i) {
                 // ローカル法線をワールド回転で変換し、上向きベクトルとの内積を見る
@@ -74,9 +51,6 @@ namespace CeeLo::Chinchiro::ECS {
                 // X/Z軸の面(2,3,4,5)は誤判定になっていた。
                 hlslpp::float3 worldNormal = hlslpp::mul(dice.faceNormal[i], transform.rotation);
                 float          dotValue    = hlslpp::dot(worldNormal, kUpDirection).x;
-#ifdef _DEBUG
-                allDots[i] = dotValue;
-#endif
 
                 if(dotValue > bestDot) {
                     bestDot   = dotValue;
@@ -92,18 +66,6 @@ namespace CeeLo::Chinchiro::ECS {
             if(changed) {
                 Tsukino::Core::Log::Info("[ChinchiroScene] Dice face changed after settle: "
                                           + std::to_string(dice.confirmedValue) + " -> " + std::to_string(bestValue));
-            }
-
-            {
-                std::ofstream& log = DebugDumpStream();
-                log << "entity=" << static_cast<uint32_t>(entity) << " pos=(" << transform.position.x << "," << transform.position.y
-                    << "," << transform.position.z << ")"
-                    << " dots=[" << allDots[0] << "," << allDots[1] << "," << allDots[2] << "," << allDots[3] << "," << allDots[4] << ","
-                    << allDots[5] << "]"
-                    << " bestValue=" << static_cast<int>(bestValue) << " prevConfirmed=" << static_cast<int>(dice.confirmedValue)
-                    << " changed=" << (changed ? 1 : 0) << " linVel=" << hlslpp::length(rigidbody.linearVelocity).x
-                    << " angVel=" << hlslpp::length(rigidbody.angularVelocity).x << "\n";
-                log.flush();
             }
 #endif
 

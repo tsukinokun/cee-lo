@@ -39,30 +39,6 @@ namespace CeeLo::Chinchiro::ECS {
         constexpr float kReturnSpeed  = 40.0f;               //!< お椀中心方向へ戻す際の目標速度
 
         //-------------------------------------------------------------
-        //! @brief  -1.0f 〜 1.0f のランダム値を返す
-        //-------------------------------------------------------------
-        float RandomUnit() {
-            return (static_cast<float>(rand()) / static_cast<float>(RAND_MAX)) * 2.0f - 1.0f;
-        }
-
-        //-------------------------------------------------------------
-        //! @brief  ImpulseRequestComponentを加算する形で設定する
-        //!         （同一フレーム内で他のシステムから既に要求が積まれていても上書きしないため）
-        //-------------------------------------------------------------
-        void AccumulateImpulse(Tsukino::ECS::Registry& registry, Tsukino::ECS::Entity entity, const hlslpp::float3& impulse,
-                                const hlslpp::float3& angularImpulse) {
-            if(auto* existing = registry.try_get<Tsukino::BuiltIn::ECS::ImpulseRequestComponent>(entity)) {
-                existing->impulse += impulse;
-                existing->angularImpulse += angularImpulse;
-            } else {
-                Tsukino::BuiltIn::ECS::ImpulseRequestComponent& request =
-                    registry.AddComponent<Tsukino::BuiltIn::ECS::ImpulseRequestComponent>(entity);
-                request.impulse        = impulse;
-                request.angularImpulse = angularImpulse;
-            }
-        }
-
-        //-------------------------------------------------------------
         //! @brief  1つのサイコロの判定関連フラグをリセットする
         //-------------------------------------------------------------
         void ResetDiceJudgeState(DiceComponent& dice) {
@@ -71,6 +47,31 @@ namespace CeeLo::Chinchiro::ECS {
             dice.settleTimer    = 0.0f;
         }
     }    // namespace
+
+    //-------------------------------------------------------------
+    //! @brief  min 〜 max のランダムな浮動小数値を返す
+    //-------------------------------------------------------------
+    float RandomFloat(float min, float max) {
+        const float t = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+        return min + t * (max - min);
+    }
+
+    //-------------------------------------------------------------
+    //! @brief  ImpulseRequestComponentを加算する形で設定する
+    //!         （同一フレーム内で他のシステムから既に要求が積まれていても上書きしないため）
+    //-------------------------------------------------------------
+    void AccumulateImpulse(Tsukino::ECS::Registry& registry, Tsukino::ECS::Entity entity, const hlslpp::float3& impulse,
+                            const hlslpp::float3& angularImpulse) {
+        if(auto* existing = registry.try_get<Tsukino::BuiltIn::ECS::ImpulseRequestComponent>(entity)) {
+            existing->impulse += impulse;
+            existing->angularImpulse += angularImpulse;
+        } else {
+            Tsukino::BuiltIn::ECS::ImpulseRequestComponent& request =
+                registry.AddComponent<Tsukino::BuiltIn::ECS::ImpulseRequestComponent>(entity);
+            request.impulse        = impulse;
+            request.angularImpulse = angularImpulse;
+        }
+    }
 
     //-------------------------------------------------------------
     //! @brief  diceIndex(0〜2)番目のサイコロの投下待ち位置（お椀中心からの相対座標）を返す
@@ -119,7 +120,7 @@ namespace CeeLo::Chinchiro::ECS {
         rigidbody.isFreezeDirty   = true;
 
         // 投下（DropDiceSet）されるまでその場で回転し続けるよう、ランダムな向きのトルクを与え続ける
-        rigidbody.torque = hlslpp::float3(RandomUnit(), RandomUnit(), RandomUnit()) * kHoverSpinTorque;
+        rigidbody.torque = hlslpp::float3(RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f), RandomFloat(-1.0f, 1.0f)) * kHoverSpinTorque;
 
         dice.state = DiceRollState::Hovering;
         ResetDiceJudgeState(dice);

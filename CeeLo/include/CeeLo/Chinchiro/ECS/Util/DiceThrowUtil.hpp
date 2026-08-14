@@ -15,6 +15,23 @@ namespace CeeLo::Chinchiro::ECS {
     struct RoundComponent;
 
     //-------------------------------------------------------------
+    //! @brief  min 〜 max のランダムな浮動小数値を返す
+    //! @note   呼び出し前に一度 std::srand() でシードしておくこと（WinMainで実施）
+    //-------------------------------------------------------------
+    float RandomFloat(float min, float max);
+
+    //-------------------------------------------------------------
+    //! @brief  ImpulseRequestComponentを加算する形で設定する
+    //!         （同一フレーム内で他のシステムから既に要求が積まれていても上書きしないため）
+    //! @param  registry       [in] ECSレジストリ
+    //! @param  entity         [in] 対象エンティティ
+    //! @param  impulse        [in] 加算する並進インパルス
+    //! @param  angularImpulse [in] 加算する角インパルス
+    //-------------------------------------------------------------
+    void AccumulateImpulse(Tsukino::ECS::Registry& registry, Tsukino::ECS::Entity entity, const hlslpp::float3& impulse,
+                            const hlslpp::float3& angularImpulse);
+
+    //-------------------------------------------------------------
     //! @brief  お椀中心から見た、diceIndex(0〜2)番目のサイコロの投下待ち位置（相対座標）を返す
     //!         （3個がお椀の中に収まるよう、初期生成とRespawnDiceSetの両方でこれを使う）
     //! @param  diceIndex [in] RoundComponent::dice内でのインデックス（0〜2）

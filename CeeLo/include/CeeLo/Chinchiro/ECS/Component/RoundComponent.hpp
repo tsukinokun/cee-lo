@@ -26,6 +26,30 @@ namespace CeeLo::Chinchiro::ECS {
     };
 
     //-------------------------------------------------------------
+    //! @brief  役の英語名を返す（subValueは含まない。UI表示・ログ出力それぞれの
+    //!         呼び出し側で文字種変換やsubValueの付与を行う）
+    //! @param  hand [in] 役
+    //-------------------------------------------------------------
+    inline const char* HandName(Hand hand) {
+        switch(hand) {
+        case Hand::PinZoro:
+            return "PinZoro";
+        case Hand::Arashi:
+            return "Arashi";
+        case Hand::Shigoro:
+            return "Shigoro";
+        case Hand::Me:
+            return "Me";
+        case Hand::HiFuMi:
+            return "HiFuMi";
+        case Hand::MeNashi:
+            return "MeNashi";
+        default:
+            return "None";
+        }
+    }
+
+    //-------------------------------------------------------------
     //! @struct RoundComponent
     //! @brief  1プレイヤー分、3つのサイコロをまとめて役判定するためのデータ
     //-------------------------------------------------------------
