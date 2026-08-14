@@ -227,6 +227,118 @@ namespace {
         return labelEntity;
     }
 
+    //-------------------------------------------------------------
+    //! @brief  シーンで使用する全システムを優先度付きで登録する
+    //! @param  scene    [in] システムを登録するシーン
+    //! @param  context  [in] エンジンコンテキスト（EffectSystemの登録に使用）
+    //! @param  eventBus [in] EventBus（PhysicsSystem/EffectSystemの登録に使用）
+    //-------------------------------------------------------------
+    void RegisterSystems(Tsukino::ECS::Scene& scene, Tsukino::EngineIntegration::EngineContext* context, Tsukino::ECS::EventBus& eventBus) {
+        // 数値が小さいほど先に更新される。以下の並び順がそのまま実行順序になる。
+        enum class SystemPriority : int {
+            Transform = 0,
+            Animation,
+            HeightmapGeneration,
+#ifdef _DEBUG
+            DebugCamera,
+#endif
+            Camera,
+            RollTrigger,
+            CPUReroll,
+            ChinchiroUI,
+            Font,
+            SpriteRender,
+            Model,
+            Effect,
+            Audio,
+            Physics,
+            DiceBounds,
+            DiceRespawn,
+            DiceHoverLimit,
+            DirectionalLight,
+            SkyAtmosphere,
+#ifdef _DEBUG
+            DiceDebugOverride,    // 役の強制発生。判定系(DiceRestDetection以降)より前に置く
+#endif
+            DiceRestDetection,
+            DiceFaceRead,
+            HandJudge,
+            TurnRule,
+            Compare,
+            ResultInput,
+        };
+
+        // Transformは一番最初に計算する
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::TransformSystem>(), (int)SystemPriority::Transform);
+        // アニメーションはTransformの後に更新する
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::AnimationSystem>(), (int)SystemPriority::Animation);
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::HeightmapGenerationSystem>(), (int)SystemPriority::HeightmapGeneration);
+
+#ifdef _DEBUG
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::DebugCameraSystem>(), (int)SystemPriority::DebugCamera);
+#endif
+        // カメラは描画前に更新する
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::CameraSystem>(), (int)SystemPriority::Camera);
+
+        // 人間の入力検知（開始・個別振り直し）
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::RollTriggerSystem>(), (int)SystemPriority::RollTrigger);
+        // CPUの「考え中」タイマー消化・自動振り直し
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::CPURerollSystem>(), (int)SystemPriority::CPUReroll);
+        // UIラベルのテキスト更新。FontRendererSystemより前に置くこと
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::ChinchiroUISystem>(), (int)SystemPriority::ChinchiroUI);
+
+        // フォント描画
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::FontRendererSystem>(), (int)SystemPriority::Font);
+        // スプライトなど描画用のコマンド生成は後で行う
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::SpriteRenderSystem>(), (int)SystemPriority::SpriteRender);
+        // モデル描画
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::ModelSystem>(), (int)SystemPriority::Model);
+        // エフェクト描画
+        {
+            auto effectSystem = std::make_shared<Tsukino::BuiltIn::ECS::EffectSystem>();
+            scene.AddSystem(effectSystem, (int)SystemPriority::Effect);
+            effectSystem->Initialize(scene.GetRegistry(), eventBus);
+            context->effectSystem = effectSystem.get();
+        }
+        // オーディオの更新
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::AudioSystem>(), (int)SystemPriority::Audio);
+        // コリジョンの更新は最後に行う
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::PhysicsSystem>(eventBus), (int)SystemPriority::Physics);
+        // 場外に出たサイコロをお椀中心へ戻す
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceBoundsSystem>(), (int)SystemPriority::DiceBounds);
+        // リスポン中（Kinematicテレポート）のサイコロを、PhysicsSystemがテレポートを
+        // 反映した後にHovering（投下待ち）へ引き継ぐ（PhysicsSystemより後段であればよい）
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceRespawnSystem>(), (int)SystemPriority::DiceRespawn);
+        // 投下待ち中のサイコロの角速度に上限をかける（待機時間に比例して勢いが
+        // 増え続け、着地が乱れて出目誤判定の原因になっていた）
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceHoverLimitSystem>(), (int)SystemPriority::DiceHoverLimit);
+        // ライトの更新
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::DirectionalLightSystem>(), (int)SystemPriority::DirectionalLight);
+        // スカイアトモスフィアの更新
+        scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::SkyAtmosphereSystem>(), (int)SystemPriority::SkyAtmosphere);
+
+#ifdef _DEBUG
+        // 検証用：数字キーで役を強制発生させる（両お椀に同時に適用される。動作確認用）
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceDebugOverrideSystem>(), (int)SystemPriority::DiceDebugOverride);
+#endif
+
+        //--------------------------------------------------------------
+        // サイコロの静止判定・出目確定・役判定
+        //--------------------------------------------------------------
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceRestDetectionSystem>(), (int)SystemPriority::DiceRestDetection);
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceFaceReadSystem>(), (int)SystemPriority::DiceFaceRead);
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::HandJudgeSystem>(), (int)SystemPriority::HandJudge);
+
+        //--------------------------------------------------------------
+        // ラウンド進行（目なし/ヒフミの再挑戦・3回失敗、勝敗比較）
+        //--------------------------------------------------------------
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::TurnRuleSystem>(), (int)SystemPriority::TurnRule);
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::CompareSystem>(), (int)SystemPriority::Compare);
+
+        // リザルト中のスペース入力でシーンを再読込する
+        scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::ResultInputSystem>(), (int)SystemPriority::ResultInput);
+    }
+
 }    // namespace
 
 // 名前空間 : CeeLo
@@ -252,76 +364,7 @@ namespace CeeLo {
         //--------------------------------------------------------------
         // システムの生成と追加
         //--------------------------------------------------------------
-        // Transformは一番最初に計算する (優先度 0)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::TransformSystem>(), 0);
-        // アニメーションはTransformの後に更新する (優先度 2)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::AnimationSystem>(), 2);
-
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::HeightmapGenerationSystem>(), 3);
-
-#ifdef _DEBUG
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::DebugCameraSystem>(), 4);
-#endif
-        // カメラは描画前に更新する (優先度 5)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::CameraSystem>(), 5);
-
-        // 人間の入力検知（開始・個別振り直し） (優先度 6)
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::RollTriggerSystem>(), 6);
-        // CPUの「考え中」タイマー消化・自動振り直し (優先度 7)
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::CPURerollSystem>(), 7);
-        // UIラベルのテキスト更新。FontRendererSystemより前に置くこと (優先度 8)
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::ChinchiroUISystem>(), 8);
-
-        // フォント描画 (優先度 9)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::FontRendererSystem>(), 9);
-        // スプライトなど描画用のコマンド生成は後で行う (優先度 10)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::SpriteRenderSystem>(), 10);
-        // モデル描画 (優先度 10)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::ModelSystem>(), 10);
-        // エフェクト描画 (優先度 10)
-        {
-            auto effectSystem = std::make_shared<Tsukino::BuiltIn::ECS::EffectSystem>();
-            m_scene.AddSystem(effectSystem, 10);
-            effectSystem->Initialize(m_scene.GetRegistry(), eventBus);
-            context->effectSystem = effectSystem.get();
-        }
-        // オーディオの更新 (優先度 11)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::AudioSystem>(), 11);
-        // コリジョンの更新は最後に行う (優先度 12)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::PhysicsSystem>(eventBus), 12);
-        // 場外に出たサイコロをお椀中心へ戻す (優先度 13)
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceBoundsSystem>(), 13);
-        // リスポン中（Kinematicテレポート）のサイコロを、PhysicsSystemがテレポートを
-        // 反映した後にHovering（投下待ち）へ引き継ぐ (優先度 13。PhysicsSystemより後段であればよい)
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceRespawnSystem>(), 13);
-        // 投下待ち中のサイコロの角速度に上限をかける（待機時間に比例して勢いが
-        // 増え続け、着地が乱れて出目誤判定の原因になっていた） (優先度 13)
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceHoverLimitSystem>(), 13);
-        // ライトの更新 (優先度 14)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::DirectionalLightSystem>(), 14);
-        // スカイアトモスフィアの更新 (優先度 15)
-        m_scene.AddSystem(std::make_shared<Tsukino::BuiltIn::ECS::SkyAtmosphereSystem>(), 15);
-
-        //--------------------------------------------------------------
-        // サイコロの静止判定・出目確定・役判定
-        //--------------------------------------------------------------
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceRestDetectionSystem>(), 16);
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceFaceReadSystem>(), 17);
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::HandJudgeSystem>(), 18);
-
-        //--------------------------------------------------------------
-        // ラウンド進行（目なし/ヒフミの再挑戦・3回失敗、勝敗比較）
-        //--------------------------------------------------------------
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::TurnRuleSystem>(), 19);
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::CompareSystem>(), 20);
-
-        // リザルト中のスペース入力でシーンを再読込する (優先度 21)
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::ResultInputSystem>(), 21);
-
-#ifdef _DEBUG
-        // 検証用：数字キーで役を強制発生させる（両お椀に同時に適用される。動作確認用）
-        m_scene.AddSystem(std::make_shared<CeeLo::Chinchiro::ECS::DiceDebugOverrideSystem>(), 15);
-#endif
+        RegisterSystems(m_scene, context, eventBus);
 
         //--------------------------------------------------------------
         // アセットのロード
