@@ -39,8 +39,6 @@
 #include <Tsukino/BuiltIn/ECS/Component/CollisionComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/RigidBodyComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/AnimationControllerComponent.hpp>
-#include <Tsukino/BuiltIn/ECS/Component/DirectionalLightComponent.hpp>
-#include <Tsukino/BuiltIn/ECS/Component/SkyAtmosphereComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/SpringBoneComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/DebugCameraComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/DebugCameraTag.hpp>
@@ -445,20 +443,16 @@ namespace CeeLo {
         // ディレクショナルライトエンティティの生成
         //--------------------------------------------------------------
         {
-            Tsukino::ECS::Entity                              lightEntity = m_scene.CreateEntity();
-            Tsukino::BuiltIn::ECS::DirectionalLightComponent& light = registry.AddComponent<Tsukino::BuiltIn::ECS::DirectionalLightComponent>(lightEntity);
-            light.direction                                         = hlslpp::float3(0.0f, -0.5f, -1.0f);
-            light.color                                             = hlslpp::float3(1.0f, 1.0f, 1.0f);
-            light.intensity                                         = 5.0f;
-            light.castShadow                                        = true;
+            const std::string prefabPath  = "CeeLo/Assets/Prefabs/DirectionalLight/Prefab.json";
+            entt::entity      lightEntity = context->prefabFactory->Instantiate(prefabPath, registry);
         }
 
         //--------------------------------------------------------------
         // スカイアトモスフィアエンティティの生成
         //--------------------------------------------------------------
         {
-            Tsukino::ECS::Entity skyEntity = m_scene.CreateEntity();
-            registry.AddComponent<Tsukino::BuiltIn::ECS::SkyAtmosphereComponent>(skyEntity);
+            const std::string prefabPath = "CeeLo/Assets/Prefabs/Sky/Prefab.json";
+            entt::entity      skyEntity  = context->prefabFactory->Instantiate(prefabPath, registry);
         }
     }
 

@@ -1,0 +1,8 @@
+{
+    "Components": [
+        {
+            "key": "DirectionalLightComponent",
+            "value": "CeeLo/Assets/Prefabs/DirectionalLight/DirectionalLightComponent.json"
+        }
+    ]
+}
