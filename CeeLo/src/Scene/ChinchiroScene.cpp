@@ -46,9 +46,6 @@
 // チンチロ固有のコンポーネント
 #include <CeeLo/Chinchiro/ECS/RegisterChinchiroComponents.hpp>
 #include <CeeLo/Chinchiro/ECS/Component/RoundOwnerComponent.hpp>
-#include <CeeLo/Chinchiro/ECS/Component/RoundComponent.hpp>
-#include <CeeLo/Chinchiro/ECS/Component/PlayerComponent.hpp>
-#include <CeeLo/Chinchiro/ECS/Component/CPUControllerComponent.hpp>
 #include <CeeLo/Chinchiro/ECS/Component/GameStateComponent.hpp>
 #include <CeeLo/Chinchiro/ECS/Component/UILabelTags.hpp>
 #include <CeeLo/Chinchiro/ECS/Util/DiceThrowUtil.hpp>
@@ -119,24 +116,66 @@ namespace {
     }
 
     //-------------------------------------------------------------
-    //! @brief  1セット分（3個）のサイコロエンティティをPrefabから生成する
-    //! @param  context         [in] Prefabの組み立てに使うエンジンコンテキスト
-    //! @param  registry        [in] ECSレジストリ
-    //! @param  diceModelHandle [in] サイコロモデルのアセットハンドル
-    //! @param  bowlCenter      [in] 所属するお椀の中心座標（RoundOwnerComponent/場外判定に使用）
+    //! @brief  CPU/プレイヤー双方のDice(計6個)・Round(2個)・Player(2個)エンティティを、
+    //!         EntityRef参照込みで1つのバッチとしてまとめて生成する
+    //! @param  context          [in]  Prefabの組み立てに使うエンジンコンテキスト
+    //! @param  registry         [in]  ECSレジストリ
+    //! @param  diceModelHandle  [in]  サイコロモデルのアセットハンドル
+    //! @param  cpuBowlCenter    [in]  CPU側お椀の中心座標（RoundOwnerComponent/場外判定に使用）
+    //! @param  playerBowlCenter [in]  プレイヤー側お椀の中心座標（同上）
+    //! @param  outCpuEntity     [out] 生成されたCPU側PlayerComponentエンティティ
+    //! @param  outPlayerEntity  [out] 生成された人間側PlayerComponentエンティティ
     //-------------------------------------------------------------
-    std::array<Tsukino::ECS::Entity, 3> CreateDiceSet(Tsukino::EngineIntegration::EngineContext* context, Tsukino::ECS::Registry& registry,
-                                                        Tsukino::Asset::AssetHandle diceModelHandle, const hlslpp::float3& bowlCenter) {
-        std::array<Tsukino::ECS::Entity, 3> diceEntities{};
-        const std::string                   prefabPath = "CeeLo/Assets/Prefabs/Dice/Prefab.json";
+    void CreateRoundAndPlayers(Tsukino::EngineIntegration::EngineContext* context, Tsukino::ECS::Registry& registry,
+                                Tsukino::Asset::AssetHandle diceModelHandle, const hlslpp::float3& cpuBowlCenter,
+                                const hlslpp::float3& playerBowlCenter, Tsukino::ECS::Entity& outCpuEntity, Tsukino::ECS::Entity& outPlayerEntity) {
+        using GroupEntry = Tsukino::Engine::ECS::Prefab::PrefabFactory::GroupEntry;
 
-        for(int i = 0; i < 3; ++i) {
-            entt::entity diceEntity = context->prefabFactory->Instantiate(prefabPath, registry);
+        const std::string dicePrefabPath = "CeeLo/Assets/Prefabs/Dice/Prefab.json";
+
+        // ①Dice6個・Round2個・Player2個を名前付きで一括生成する。
+        //   RoundComponent.dice / PlayerComponent.roundEntityはEntityRefのため、
+        //   ここでバッチ内の名前（"#CpuDice0"等）が実体へ自動解決される。
+        const std::vector<GroupEntry> entries = {
+            {"CpuDice0",    dicePrefabPath                                },
+            {"CpuDice1",    dicePrefabPath                                },
+            {"CpuDice2",    dicePrefabPath                                },
+            {"PlayerDice0", dicePrefabPath                                },
+            {"PlayerDice1", dicePrefabPath                                },
+            {"PlayerDice2", dicePrefabPath                                },
+            {"CpuRound",    "CeeLo/Assets/Prefabs/Round/Cpu/Prefab.json"  },
+            {"PlayerRound", "CeeLo/Assets/Prefabs/Round/Player/Prefab.json"},
+            {"CpuPlayer",   "CeeLo/Assets/Prefabs/Player/Cpu/Prefab.json" },
+            {"HumanPlayer", "CeeLo/Assets/Prefabs/Player/Human/Prefab.json"},
+        };
+
+        // TODO(temp-verify): remove after manual verification
+        std::ofstream dbg2("Tsukino.Sandbox_debug_roundplayer.txt", std::ios::app);
+        dbg2 << "checkpoint0: before InstantiateGroup\n";
+        dbg2.flush();
+
+        Tsukino::Engine::ECS::Prefab::PrefabFactory::PrefabInstance instance = context->prefabFactory->InstantiateGroup(entries, registry);
+
+        dbg2 << "checkpoint1: after InstantiateGroup, size=" << instance.size() << "\n";
+        for(const auto& [name, ent] : instance) {
+            dbg2 << "  " << name << " -> " << static_cast<uint32_t>(ent) << "\n";
+        }
+        dbg2.flush();
+
+        // ②各Diceの個別設定（位置・モデル・所属お椀）はEntityRefでは表現しないデータのため、
+        //   ラベル/お椀と同様にInstantiate後にApplyOverrideで設定する。
+        const std::array<const char*, 3> cpuDiceNames    = {"CpuDice0", "CpuDice1", "CpuDice2"};
+        const std::array<const char*, 3> playerDiceNames = {"PlayerDice0", "PlayerDice1", "PlayerDice2"};
+
+        auto setupDice = [&](const char* name, int index, const hlslpp::float3& bowlCenter) {
+            dbg2 << "checkpoint2: setupDice " << name << "\n";
+            dbg2.flush();
+            entt::entity diceEntity = instance.at(name);
 
             // 3個ともお椀の中に収まり、かつ重ならないよう、投下待ち位置をX方向に少しずつずらす
             // （リスポン時の位置と一致させるため、ComputeDiceSpawnOffsetを共通で使う）
             Tsukino::BuiltIn::ECS::TransformComponent transformOverride{};
-            transformOverride.position = bowlCenter + CeeLo::Chinchiro::ECS::ComputeDiceSpawnOffset(i);
+            transformOverride.position = bowlCenter + CeeLo::Chinchiro::ECS::ComputeDiceSpawnOffset(index);
             transformOverride.dirty    = true;    // 初回計算のためフラグを立てる
             context->prefabFactory->ApplyOverride<Tsukino::BuiltIn::ECS::TransformComponent>(registry, diceEntity, transformOverride);
 
@@ -152,11 +191,21 @@ namespace {
 
             // スペース入力で投下されるまで、空中で静止＋回転しながら待機させる
             CeeLo::Chinchiro::ECS::SetupDiceHover(registry, diceEntity);
+        };
 
-            diceEntities[i] = diceEntity;
+        for(int i = 0; i < 3; ++i) {
+            setupDice(cpuDiceNames[i], i, cpuBowlCenter);
+            setupDice(playerDiceNames[i], i, playerBowlCenter);
         }
 
-        return diceEntities;
+        dbg2 << "checkpoint3: before final lookups\n";
+        dbg2.flush();
+
+        outCpuEntity    = instance.at("CpuPlayer");
+        outPlayerEntity = instance.at("HumanPlayer");
+
+        dbg2 << "checkpoint4: done\n";
+        dbg2.flush();
     }
 
     //-------------------------------------------------------------
@@ -309,33 +358,12 @@ namespace CeeLo {
         CreateBowl(context, registry, bowlModelHandle, bowlColModelHandle, cpuBowlCenter.x, kCpuTerrainSeed);
         CreateBowl(context, registry, bowlModelHandle, bowlColModelHandle, playerBowlCenter.x, kPlayerTerrainSeed);
 
-        std::array<Tsukino::ECS::Entity, 3> cpuDiceEntities    = CreateDiceSet(context, registry, diceModelHandle, cpuBowlCenter);
-        std::array<Tsukino::ECS::Entity, 3> playerDiceEntities = CreateDiceSet(context, registry, diceModelHandle, playerBowlCenter);
-
         //--------------------------------------------------------------
-        // RoundComponent：各セット3個のサイコロを束ねる
+        // Dice・Round・PlayerをEntityRef参照込みで一括生成する
         //--------------------------------------------------------------
-        Tsukino::ECS::Entity cpuRoundEntity = m_scene.CreateEntity();
-        registry.AddComponent<CeeLo::Chinchiro::ECS::RoundComponent>(cpuRoundEntity).dice = cpuDiceEntities;
-
-        Tsukino::ECS::Entity playerRoundEntity = m_scene.CreateEntity();
-        registry.AddComponent<CeeLo::Chinchiro::ECS::RoundComponent>(playerRoundEntity).dice = playerDiceEntities;
-
-        //--------------------------------------------------------------
-        // PlayerComponent：人間・CPUそれぞれの進行状態
-        //--------------------------------------------------------------
-        Tsukino::ECS::Entity cpuEntity = m_scene.CreateEntity();
-        {
-            CeeLo::Chinchiro::ECS::PlayerComponent& cpuPlayer = registry.AddComponent<CeeLo::Chinchiro::ECS::PlayerComponent>(cpuEntity);
-            cpuPlayer.roundEntity                                   = cpuRoundEntity;
-            registry.AddComponent<CeeLo::Chinchiro::ECS::CPUControllerComponent>(cpuEntity);
-        }
-
-        Tsukino::ECS::Entity playerEntity = m_scene.CreateEntity();
-        {
-            CeeLo::Chinchiro::ECS::PlayerComponent& humanPlayer = registry.AddComponent<CeeLo::Chinchiro::ECS::PlayerComponent>(playerEntity);
-            humanPlayer.roundEntity                                    = playerRoundEntity;
-        }
+        Tsukino::ECS::Entity cpuEntity;
+        Tsukino::ECS::Entity playerEntity;
+        CreateRoundAndPlayers(context, registry, diceModelHandle, cpuBowlCenter, playerBowlCenter, cpuEntity, playerEntity);
 
         //--------------------------------------------------------------
         // GameStateComponent：ゲーム全体の進行状態（シングルトン）

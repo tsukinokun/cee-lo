@@ -1,0 +1,8 @@
+{
+    "PlayerComponent": {
+        "phase": 0,
+        "rollCount": 0,
+        "eliminated": false,
+        "roundEntity": "#PlayerRound"
+    }
+}

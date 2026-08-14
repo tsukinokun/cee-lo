@@ -1,0 +1,5 @@
+{
+    "RoundComponent": {
+        "dice": ["#CpuDice0", "#CpuDice1", "#CpuDice2"]
+    }
+}

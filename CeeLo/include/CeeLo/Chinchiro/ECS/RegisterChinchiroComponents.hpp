@@ -8,6 +8,12 @@
 
 #include <CeeLo/Chinchiro/ECS/Component/DiceComponent.hpp>
 #include <CeeLo/Chinchiro/ECS/Component/RoundOwnerComponent.hpp>
+#include <CeeLo/Chinchiro/ECS/Component/CPUControllerComponent.hpp>
+#include <CeeLo/Chinchiro/ECS/Component/RoundComponent.hpp>
+#include <CeeLo/Chinchiro/ECS/Component/PlayerComponent.hpp>
+
+#include <CeeLo/Chinchiro/ECS/Serialization/RoundComponentSerialization.hpp>
+#include <CeeLo/Chinchiro/ECS/Serialization/PlayerComponentSerialization.hpp>
 
 // 名前空間 : CeeLo::Chinchiro::ECS
 namespace CeeLo::Chinchiro::ECS {
@@ -17,10 +23,16 @@ namespace CeeLo::Chinchiro::ECS {
     //! @param  factory [in] 登録先のPrefabFactory
     //-------------------------------------------------------------
     inline void RegisterChinchiroComponents(Tsukino::Engine::ECS::Prefab::PrefabFactory& factory) {
-        // どちらも実運用では常にデフォルト値（あるいはInstantiate後にApplyOverrideで
+        // 実運用では常にデフォルト値（あるいはInstantiate後にApplyOverrideで
         // 個別設定する）のため、シリアライザは実装せずアタッチのみ対応する。
         factory.RegisterComponent<DiceComponent>("DiceComponent");
         factory.RegisterComponent<RoundOwnerComponent>("RoundOwnerComponent");
+        factory.RegisterComponent<CPUControllerComponent>("CPUControllerComponent");
+
+        // dice / roundEntity がEntityRefのため、InstantiateGroupでバッチ生成した
+        // 際に自動で参照解決される
+        factory.RegisterComponent<RoundComponent>("RoundComponent");
+        factory.RegisterComponent<PlayerComponent>("PlayerComponent");
     }
 
 }    // namespace CeeLo::Chinchiro::ECS

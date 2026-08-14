@@ -1,0 +1,12 @@
+{
+    "Components": [
+        {
+            "key": "PlayerComponent",
+            "value": "CeeLo/Assets/Prefabs/Player/Cpu/PlayerComponent.json"
+        },
+        {
+            "key": "CPUControllerComponent",
+            "value": "null"
+        }
+    ]
+}

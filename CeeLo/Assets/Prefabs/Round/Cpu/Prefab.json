@@ -1,0 +1,8 @@
+{
+    "Components": [
+        {
+            "key": "RoundComponent",
+            "value": "CeeLo/Assets/Prefabs/Round/Cpu/RoundComponent.json"
+        }
+    ]
+}

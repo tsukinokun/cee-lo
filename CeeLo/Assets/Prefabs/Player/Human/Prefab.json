@@ -1,0 +1,8 @@
+{
+    "Components": [
+        {
+            "key": "PlayerComponent",
+            "value": "CeeLo/Assets/Prefabs/Player/Human/PlayerComponent.json"
+        }
+    ]
+}

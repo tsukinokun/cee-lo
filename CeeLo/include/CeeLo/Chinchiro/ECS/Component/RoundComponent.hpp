@@ -5,7 +5,7 @@
 //-------------------------------------------------------------
 #pragma once
 #include <Tsukino/Core/typedef.hpp>
-#include <Tsukino/Core/ECS/Entity/Entity.hpp>
+#include <Tsukino/Core/ECS/EntityRef/EntityRef.hpp>
 #include <array>
 
 // 名前空間 : CeeLo::Chinchiro::ECS
@@ -30,7 +30,7 @@ namespace CeeLo::Chinchiro::ECS {
     //! @brief  1プレイヤー分、3つのサイコロをまとめて役判定するためのデータ
     //-------------------------------------------------------------
     struct RoundComponent {
-        std::array<Tsukino::ECS::Entity, 3> dice{};    //!< この手番を構成する3つのDiceエンティティ
+        std::array<Tsukino::ECS::EntityRef, 3> dice{};    //!< この手番を構成する3つのDiceエンティティ
 
         Hand kind     = Hand::None;    //!< 判定された役
         u8   subValue = 0;             //!< Meの場合の目、Arashi/PinZoroのゾロ目の値
