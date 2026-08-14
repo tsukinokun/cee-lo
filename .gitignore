@@ -19,6 +19,7 @@ Release/
 
 # Logs
 *.log
+Tsukino.Sandbox_debug_roundplayer.txt
 
 # DLL / EXE
 *.dll

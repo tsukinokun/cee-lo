@@ -133,7 +133,7 @@ namespace {
 
         const std::string dicePrefabPath = "CeeLo/Assets/Prefabs/Dice/Prefab.json";
 
-        // ①Dice6個・Round2個・Player2個を名前付きで一括生成する。
+        //   Dice6個・Round2個・Player2個を名前付きで一括生成する。
         //   RoundComponent.dice / PlayerComponent.roundEntityはEntityRefのため、
         //   ここでバッチ内の名前（"#CpuDice0"等）が実体へ自動解決される。
         const std::vector<GroupEntry> entries = {
@@ -162,7 +162,7 @@ namespace {
         }
         dbg2.flush();
 
-        // ②各Diceの個別設定（位置・モデル・所属お椀）はEntityRefでは表現しないデータのため、
+        //   各Diceの個別設定（位置・モデル・所属お椀）はEntityRefでは表現しないデータのため、
         //   ラベル/お椀と同様にInstantiate後にApplyOverrideで設定する。
         const std::array<const char*, 3> cpuDiceNames    = {"CpuDice0", "CpuDice1", "CpuDice2"};
         const std::array<const char*, 3> playerDiceNames = {"PlayerDice0", "PlayerDice1", "PlayerDice2"};
