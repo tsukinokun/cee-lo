@@ -1,0 +1,12 @@
+{
+    "Components": [
+        {
+            "key": "TransformComponent",
+            "value": "CeeLo/Assets/Prefabs/Label/Transform.json"
+        },
+        {
+            "key": "FontComponent",
+            "value": "null"
+        }
+    ]
+}

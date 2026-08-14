@@ -31,7 +31,6 @@
 #include <Tsukino/BuiltIn/ECS/Component/TransformComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/CameraComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/SpriteComponent.hpp>
-#include <Tsukino/BuiltIn/ECS/Component/FontComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/AudioComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/ModelComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/AnimationPlayerComponent.hpp>
@@ -40,8 +39,6 @@
 #include <Tsukino/BuiltIn/ECS/Component/RigidBodyComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/AnimationControllerComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/SpringBoneComponent.hpp>
-#include <Tsukino/BuiltIn/ECS/Component/DebugCameraComponent.hpp>
-#include <Tsukino/BuiltIn/ECS/Component/DebugCameraTag.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/EffectComponent.hpp>
 #include <Tsukino/BuiltIn/ECS/Component/TerrainGenerationRequestComponent.hpp>
 
@@ -190,23 +187,20 @@ namespace {
     }
 
     //-------------------------------------------------------------
-    //! @brief  UIラベルエンティティ（TransformComponent + FontComponent）を生成する
-    //! @param  scene          [in] 生成先のシーン
+    //! @brief  UIラベルエンティティ（TransformComponent + FontComponent）をPrefabから生成する
+    //! @param  context        [in] Prefabの組み立てに使うエンジンコンテキスト
     //! @param  registry       [in] ECSレジストリ
     //! @param  screenPosition [in] スクリーン座標（左上原点のピクセル座標）
     //-------------------------------------------------------------
-    Tsukino::ECS::Entity CreateLabel(Tsukino::ECS::Scene& scene, Tsukino::ECS::Registry& registry, const hlslpp::float3& screenPosition) {
-        Tsukino::ECS::Entity labelEntity = scene.CreateEntity();
+    Tsukino::ECS::Entity CreateLabel(Tsukino::EngineIntegration::EngineContext* context, Tsukino::ECS::Registry& registry, const hlslpp::float3& screenPosition) {
+        const std::string prefabPath = "CeeLo/Assets/Prefabs/Label/Prefab.json";
+        entt::entity      labelEntity = context->prefabFactory->Instantiate(prefabPath, registry);
 
-        Tsukino::BuiltIn::ECS::TransformComponent& transform = registry.AddComponent<Tsukino::BuiltIn::ECS::TransformComponent>(labelEntity);
-        transform.position                                   = screenPosition;
-        transform.rotation                                   = hlslpp::quaternion(0.0f, 0.0f, 0.0f, 1.0f);    // 無回転
-        transform.scale                                      = hlslpp::float3(1.0f, 1.0f, 1.0f);
-        transform.dirty                                      = true;          // 初回計算のためフラグを立てる
-        transform.parent                                     = entt::null;    // 親なし
-
-        Tsukino::BuiltIn::ECS::FontComponent& font = registry.AddComponent<Tsukino::BuiltIn::ECS::FontComponent>(labelEntity);
-        font.text                                  = L"";    // 描画するテキスト（ChinchiroUISystemが更新する）
+        // 画面上の位置はラベルごとに異なるため、インスタンス化後に個別上書きする
+        Tsukino::BuiltIn::ECS::TransformComponent transformOverride{};
+        transformOverride.position = screenPosition;
+        transformOverride.dirty    = true;    // 初回計算のためフラグを立てる
+        context->prefabFactory->ApplyOverride<Tsukino::BuiltIn::ECS::TransformComponent>(registry, labelEntity, transformOverride);
 
         return labelEntity;
     }
@@ -378,30 +372,23 @@ namespace CeeLo {
         // UIラベルエンティティの生成（画面は1700x1000を想定した暫定配置）
         //--------------------------------------------------------------
         {
-            Tsukino::ECS::Entity cpuLabelEntity = CreateLabel(m_scene, registry, hlslpp::float3(1350.0f, 40.0f, 0.0f));
+            Tsukino::ECS::Entity cpuLabelEntity = CreateLabel(context, registry, hlslpp::float3(1350.0f, 40.0f, 0.0f));
             registry.AddComponent<CeeLo::Chinchiro::ECS::CpuHandLabelTag>(cpuLabelEntity);
 
-            Tsukino::ECS::Entity playerLabelEntity = CreateLabel(m_scene, registry, hlslpp::float3(40.0f, 40.0f, 0.0f));
+            Tsukino::ECS::Entity playerLabelEntity = CreateLabel(context, registry, hlslpp::float3(40.0f, 40.0f, 0.0f));
             registry.AddComponent<CeeLo::Chinchiro::ECS::PlayerHandLabelTag>(playerLabelEntity);
 
-            Tsukino::ECS::Entity messageLabelEntity = CreateLabel(m_scene, registry, hlslpp::float3(550.0f, 900.0f, 0.0f));
+            Tsukino::ECS::Entity messageLabelEntity = CreateLabel(context, registry, hlslpp::float3(550.0f, 900.0f, 0.0f));
             registry.AddComponent<CeeLo::Chinchiro::ECS::MessageLabelTag>(messageLabelEntity);
         }
 
         //--------------------------------------------------------------
         // 2Dカメラエンティティの生成
         //--------------------------------------------------------------
-        Tsukino::ECS::Entity cameraEntity2D = m_scene.CreateEntity();
-
-        // TransformComponent (カメラの位置)
-        Tsukino::BuiltIn::ECS::TransformComponent& camTransform2D = registry.AddComponent<Tsukino::BuiltIn::ECS::TransformComponent>(cameraEntity2D);
-        camTransform2D.position                                   = hlslpp::float3(0.0f, 0.0f, -1.0f);    // 手前に引く
-
-        // CameraComponent (投影設定)
-        Tsukino::BuiltIn::ECS::CameraComponent& camera2D = registry.AddComponent<Tsukino::BuiltIn::ECS::CameraComponent>(cameraEntity2D);
-        camera2D.projectionType                          = Tsukino::BuiltIn::ECS::CameraComponent::ProjectionType::Orthographic;
-        camera2D.orthoSize                               = 1000.0f;    // 画面の縦幅を 720 ユニットにする
-        camera2D.isPrimary                               = false;      // これをメインカメラにしない
+        {
+            const std::string prefabPath  = "CeeLo/Assets/Prefabs/Camera2D/Prefab.json";
+            entt::entity      cameraEntity2D = context->prefabFactory->Instantiate(prefabPath, registry);
+        }
 
         //--------------------------------------------------------------
         // 3Dカメラエンティティの生成（左右両方のお椀が画角に収まる引き位置は
@@ -418,24 +405,8 @@ namespace CeeLo {
         //--------------------------------------------------------------
 #ifdef _DEBUG
         {
-            Tsukino::ECS::Entity debugCamEntity = m_scene.CreateEntity();
-
-            // 実寸スケールのシーンに合わせた引き位置（自由視点なので厳密でなくてよい）
-            Tsukino::BuiltIn::ECS::TransformComponent& t = registry.AddComponent<Tsukino::BuiltIn::ECS::TransformComponent>(debugCamEntity);
-            t.position                                   = hlslpp::float3(0.0f, 50.0f, -50.0f);
-            t.rotation                                   = hlslpp::quaternion(0.0f, 0.0f, 0.0f, 1.0f);
-            t.dirty                                      = true;
-
-            Tsukino::BuiltIn::ECS::CameraComponent& cam = registry.AddComponent<Tsukino::BuiltIn::ECS::CameraComponent>(debugCamEntity);
-            cam.lookAtTarget                            = hlslpp::float3(0.0f, 0.0f, 0.0f);
-            cam.nearZ                                   = 1.0f;
-            cam.farZ                                    = 10000.0f;
-            cam.isPrimary                               = false;
-
-            Tsukino::BuiltIn::ECS::DebugCameraComponent& debug = registry.AddComponent<Tsukino::BuiltIn::ECS::DebugCameraComponent>(debugCamEntity);
-            debug.moveSpeed                                    = 1.0f;
-
-            registry.AddComponent<Tsukino::BuiltIn::ECS::DebugCameraTag>(debugCamEntity);
+            const std::string prefabPath    = "CeeLo/Assets/Prefabs/DebugCamera/Prefab.json";
+            entt::entity      debugCamEntity = context->prefabFactory->Instantiate(prefabPath, registry);
         }
 #endif
 

@@ -1,0 +1,20 @@
+{
+    "Components": [
+        {
+            "key": "TransformComponent",
+            "value": "CeeLo/Assets/Prefabs/DebugCamera/Transform.json"
+        },
+        {
+            "key": "CameraComponent",
+            "value": "CeeLo/Assets/Prefabs/DebugCamera/Camera.json"
+        },
+        {
+            "key": "DebugCameraComponent",
+            "value": "CeeLo/Assets/Prefabs/DebugCamera/DebugCameraComponent.json"
+        },
+        {
+            "key": "DebugCameraTag",
+            "value": "null"
+        }
+    ]
+}
